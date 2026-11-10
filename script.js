@@ -111,7 +111,7 @@ startButton.addEventListener("click", async function () {
 
         }
 
-    } catch (error) {
+        } catch (error) {
 
         console.warn("Fullscreen gagal:", error);
 
@@ -124,12 +124,19 @@ startButton.addEventListener("click", async function () {
 
     wasFullscreen = Boolean(document.fullscreenElement);
 
+    // Simpan ukuran awal setelah fullscreen selesai
+    setTimeout(function () {
+
+        saveInitialViewport();
+        resizeWarningTriggered = false;
+
+    }, 300);
+
     updateFullscreenStatus();
 
     updateWarnings();
 
     console.log("EXAM STARTED");
-
 });
 
 
@@ -231,41 +238,74 @@ function updateFullscreenStatus() {
 // =====================================
 
 // =====================================
-// ANDROID SPLIT SCREEN DETECTION
+// SENSITIVE SCREEN SIZE DETECTION
 // =====================================
 
 let initialWidth = 0;
 let initialHeight = 0;
 let resizeWarningTriggered = false;
 
+// Toleransi perubahan ukuran dalam pixel
+const RESIZE_THRESHOLD = 2;
+
 function saveInitialViewport() {
-    initialWidth = window.innerWidth;
-    initialHeight = window.innerHeight;
+
+    const viewport = window.visualViewport;
+
+    initialWidth = Math.min(
+        window.innerWidth,
+        viewport ? viewport.width : window.innerWidth
+    );
+
+    initialHeight = Math.min(
+        window.innerHeight,
+        viewport ? viewport.height : window.innerHeight
+    );
+
+    console.log("Ukuran awal ujian:", {
+        width: initialWidth,
+        height: initialHeight
+    });
 }
+
 
 function checkViewport() {
 
     if (!active || ending) return;
 
-    const currentWidth = window.innerWidth;
-    const currentHeight = window.innerHeight;
+    // Belum ada ukuran awal
+    if (initialWidth === 0 || initialHeight === 0) return;
 
-    const widthRatio = currentWidth / initialWidth;
-    const heightRatio = currentHeight / initialHeight;
+    const viewport = window.visualViewport;
 
-    console.log("Viewport:", {
-        width: currentWidth,
-        height: currentHeight,
-        widthRatio,
-        heightRatio
+    const currentWidth = Math.min(
+        window.innerWidth,
+        viewport ? viewport.width : window.innerWidth
+    );
+
+    const currentHeight = Math.min(
+        window.innerHeight,
+        viewport ? viewport.height : window.innerHeight
+    );
+
+    const widthReduced =
+        currentWidth < initialWidth - RESIZE_THRESHOLD;
+
+    const heightReduced =
+        currentHeight < initialHeight - RESIZE_THRESHOLD;
+
+    console.log("Pemeriksaan ukuran layar:", {
+        initialWidth,
+        initialHeight,
+        currentWidth,
+        currentHeight,
+        widthReduced,
+        heightReduced
     });
 
-    // Perubahan ukuran signifikan
-    const widthChanged = widthRatio < 0.80;
-    const heightChanged = heightRatio < 0.70;
-
+    // Jika ukuran layar mengecil sedikit saja
     if (
-        (widthChanged || heightChanged) &&
+        (widthReduced || heightReduced) &&
         !resizeWarningTriggered
     ) {
 
@@ -273,24 +313,35 @@ function checkViewport() {
 
         addWarning(
             "Perubahan ukuran layar terdeteksi!",
-            "Kemungkinan split-screen, floating window, atau perubahan viewport."
+            "Ukuran layar ujian mengecil. Kemungkinan split-screen, floating window, atau perubahan viewport."
         );
 
     }
 
-    // Reset ketika ukuran kembali normal
+    // Aktifkan kembali deteksi jika ukuran kembali normal
     if (
-        widthRatio > 0.90 &&
-        heightRatio > 0.90
+        currentWidth >= initialWidth - RESIZE_THRESHOLD &&
+        currentHeight >= initialHeight - RESIZE_THRESHOLD
     ) {
+
         resizeWarningTriggered = false;
+
     }
 }
 
+
+// Deteksi perubahan ukuran browser
 window.addEventListener("resize", checkViewport);
 
-// Simpan ukuran awal saat ujian dimulai
+// Deteksi perubahan visual viewport Android
+if (window.visualViewport) {
 
+    window.visualViewport.addEventListener(
+        "resize",
+        checkViewport
+    );
+
+}
 
 // =====================================
 // FINISH EXAM
@@ -305,8 +356,7 @@ finishButton.addEventListener("click", async function () {
     if (!confirmFinish) return;
 
     ending = true;
-    active = false;
-
+    active = true;
     sessionStorage.removeItem("examActive");
 
     document.getElementById("finalWarnings").textContent =
