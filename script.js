@@ -230,18 +230,66 @@ function updateFullscreenStatus() {
 // RESIZE DETECTION
 // =====================================
 
-window.addEventListener("resize", function () {
+// =====================================
+// ANDROID SPLIT SCREEN DETECTION
+// =====================================
 
-    console.log("Ukuran viewport berubah:", {
-        width: window.innerWidth,
-        height: window.innerHeight
+let initialWidth = 0;
+let initialHeight = 0;
+let resizeWarningTriggered = false;
+
+function saveInitialViewport() {
+    initialWidth = window.innerWidth;
+    initialHeight = window.innerHeight;
+}
+
+function checkViewport() {
+
+    if (!active || ending) return;
+
+    const currentWidth = window.innerWidth;
+    const currentHeight = window.innerHeight;
+
+    const widthRatio = currentWidth / initialWidth;
+    const heightRatio = currentHeight / initialHeight;
+
+    console.log("Viewport:", {
+        width: currentWidth,
+        height: currentHeight,
+        widthRatio,
+        heightRatio
     });
 
-    // Resize dicatat untuk analisis.
-    // Tidak otomatis dianggap pelanggaran karena
-    // keyboard dan rotasi layar juga bisa mengubah ukuran.
+    // Perubahan ukuran signifikan
+    const widthChanged = widthRatio < 0.80;
+    const heightChanged = heightRatio < 0.70;
 
-});
+    if (
+        (widthChanged || heightChanged) &&
+        !resizeWarningTriggered
+    ) {
+
+        resizeWarningTriggered = true;
+
+        addWarning(
+            "Perubahan ukuran layar terdeteksi!",
+            "Kemungkinan split-screen, floating window, atau perubahan viewport."
+        );
+
+    }
+
+    // Reset ketika ukuran kembali normal
+    if (
+        widthRatio > 0.90 &&
+        heightRatio > 0.90
+    ) {
+        resizeWarningTriggered = false;
+    }
+}
+
+window.addEventListener("resize", checkViewport);
+
+// Simpan ukuran awal saat ujian dimulai
 
 
 // =====================================
